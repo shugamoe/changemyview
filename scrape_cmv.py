@@ -187,9 +187,9 @@ def get_top_archived(subreddit, num_posts):
         if post.archived:
             archived_ids.append(post.id)
             ids_recoreded += 1
+            print('{} submission ids recorded'.format(ids_recoreded))
             if ids_recoreded == num_posts:
                 break
-            print('{} submission ids recorded'.format(ids_recoreded))
 
     print('Top archived r/changemyview post IDs retrieved.\n')
     return(archived_ids)
@@ -274,11 +274,12 @@ def parse_top_comments(comment_tree, df_dict, sub_dict):
             com_details['com_text'] = com_text
 
             parse_replies(com.replies, df_dict, sub_dict, com_details)
-            
+
 
 def parse_replies(reply_tree, df_dict, sub_dict, com_dict):
     '''
     '''
+    print('Expanding reply tree. . . ')
     reply_tree.replace_more(limit = None)
     print('\tEntering reply tree. . .')
     for reply in reply_tree.list():
