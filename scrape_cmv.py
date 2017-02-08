@@ -260,7 +260,7 @@ def parse_top_comments(comment_tree, df_dict, sub_dict):
             com_details = {'com_id': com.id, 
                            'com_created': com.created_utc,
                            'com_upvotes': com.ups, 
-                           'com_downvotes': com.down,
+                           'com_downvotes': com.downs,
                            'com_author': str(com.author),
                            'com_text': None,
 
