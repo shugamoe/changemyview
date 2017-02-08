@@ -215,7 +215,7 @@ def top_com_info(reddit, num_posts):
 
     sub_count = 0
     sub_total = len(submission_ids)
-    for submit_id in submission_ids[3:]:
+    for submit_id in submission_ids:
         sub_count += 1
         print('Accessing submission. . . #{}'.format(sub_count))
         submission = reddit.submission(submit_id)
@@ -260,7 +260,7 @@ def parse_top_comments(comment_tree, df_dict, sub_dict):
             com_details = {'com_id': com.id, 
                            'com_created': com.created_utc,
                            'com_upvotes': com.ups, 
-                           'com_downvotes': com.downs,
+                           'com_downvotes': com.down
                            'com_author': str(com.author),
                            'com_text': None,
 
