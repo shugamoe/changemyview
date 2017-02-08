@@ -7,6 +7,7 @@ import os
 import pandas as pd
 import re
 import numpy as np
+import time
              
 SUB_OF_INT = 'changemyview'
 START_2016 = 1451606400
@@ -16,6 +17,7 @@ DB_REJECT_COMMENT = '5sivuk'
 DB_CONFIRM_COMMENT = '5sjmsq'
 
 TEST_SUBS = ['4k83qf', '4rdmlg']
+TEST_SUBS = ['4rdmlg']
 
 # Utility functions
 def make_output_dir(dir_name):
@@ -74,34 +76,6 @@ def get_smut(df_name, subreddit = 'gonewildstories'):
     loc = '{}.pkl'.format(df_name)
     df.to_pickle(loc)
     print('Dataframe written as {}'.format(loc))
-
-
-def get_top_archived(subreddit = SUB_OF_INT):
-    '''
-    This function returns a reddit instance for further work and a list of the 
-    ids of all the top all time posts on r/changemyview.
-    '''
-    ids_recoreded = 0
-    # Start reddit instance
-    reddit = praw.Reddit('ccanal', # Site ID
-                         user_agent = '/u/shugamoe content analysis scraper',
-                         )
-    reddit.read_only = True # Don't want to accidentally do stuff
-
-    # Get r/changemyview and get top posts of all time
-    cmv = reddit.subreddit(subreddit)
-    top_cmv_alltime = cmv.top(time_filter = 'all', limit = None)
-
-    # Parse the top submissions, record their submission IDs if they are archived
-    archived_ids = []
-    for post in top_cmv_alltime:
-        if post.archived:
-            archived_ids.append(post.id)
-            ids_recoreded += 1
-            print('{} submission ids recorded'.format(ids_recoreded))
-
-    print('Top archived r/changemyview post IDs retrieved.\n')
-    return(reddit, archived_ids)
 
 
 def parse_submissions(reddit, submit_ids, sample_prop):
@@ -191,14 +165,37 @@ def sub_to_df(reddit, post_id, name, report_title = False):
 
 
 ### PROJECT WORK
+def get_top_archived(subreddit, num_posts):
+    '''
+    This function returns a reddit instance for further work and a list of the 
+    ids of all the top all time posts on r/changemyview.
+    '''
+    ids_recoreded = 0
+    # Start reddit instance
+    reddit = praw.Reddit('ccanal', # Site ID
+                         user_agent = '/u/shugamoe content analysis scraper',
+                         )
+    reddit.read_only = True # Don't want to accidentally do stuff
+
+    # Get r/changemyview and get top posts of all time
+    cmv = reddit.subreddit(subreddit)
+    top_cmv_alltime = cmv.top(time_filter = 'all', limit = None)
+
+    # Parse the top submissions, record their submission IDs if they are archived
+    archived_ids = []
+    for post in top_cmv_alltime:
+        if post.archived:
+            archived_ids.append(post.id)
+            ids_recoreded += 1
+            if ids_recoreded == num_posts:
+                break
+            print('{} submission ids recorded'.format(ids_recoreded))
+
+    print('Top archived r/changemyview post IDs retrieved.\n')
+    return(archived_ids)
 
 
-
-
-
-
-
-def top_com_info(reddit, submission_ids):
+def top_com_info(reddit, num_posts):
     '''
     This function makes a pandas dataframe that collects information for each 
     top comment from a sample of submission from /r/changemyview.
@@ -207,16 +204,27 @@ def top_com_info(reddit, submission_ids):
     was awarded or not (1, 0), and whether a delta was awarded by the original
     poster (2), as well as the text of the question and the title of the question.
     '''
-    df_dict = {'com_id': [], 'upvotes': [], 'downvotes': [], 'com_author': [], 'com_text': [],
-               'delta_status': [], 'sub_id': [], 'sub_author': [], 'sub_title': [], 'sub_text': []}
+    submission_ids = get_top_archived('changemyview', num_posts)
+    time.sleep(2)
+    df_dict = { # Comment attributes
+               'com_id': [], 'com_created': [], 'com_upvotes': [], 'com_downvotes': [], 'com_author': [], 'com_text': [],
+               'com_delta_status': [], 'com_delta_giver': [], 
 
-    for submit_id in submission_ids:
+               # Original post attributes
+               'sub_id': [], 'sub_created': [], 'sub_author': [], 'sub_title': [], 'sub_text': []}
+
+    sub_count = 0
+    sub_total = len(submission_ids)
+    for submit_id in submission_ids[3:]:
+        sub_count += 1
+        print('Accessing submission. . . #{}'.format(sub_count))
         submission = reddit.submission(submit_id)
-        sub_details = {'sub_id': submission.id, 
+        sub_details = {'sub_id': submission.id, # Pass by ref through funcs 
+                       'sub_created': submission.created_utc,
                        'sub_author': str(submission.author),
                        'sub_title': submission.title,
-                       'sub_text': None}
-
+                       'sub_text': None
+                       }
         # Self text sometimes contains a moderator message that must be removed
         # Also want to remove html links.
         mod_prefix = '\\n_____\\n\\n.*'
@@ -226,7 +234,15 @@ def top_com_info(reddit, submission_ids):
         sub_details['sub_text'] = selftext
 
         parse_top_comments(submission.comments, df_dict, sub_details)
+        print('{} subs parsed ({:.3f}%)'.format(sub_count, 100 * sub_count / sub_total))
 
+    # Create and output the dataframe
+    df = pd.DataFrame(df_dict, index = df_dict['com_id'])
+    df['com_created'] = pd.to_datetime(df['com_created'],unit='s')
+    df['sub_created'] = pd.to_datetime(df['sub_created'],unit='s')
+
+    df.to_pickle('test_projdat.pkl')
+    print('Dataframe written')
     return(None)
 
 
@@ -234,42 +250,97 @@ def parse_top_comments(comment_tree, df_dict, sub_dict):
     '''
     '''
     for com in comment_tree:
+        print('Entering comment. . . ')
         if isinstance(com, praw.models.MoreComments):
-             parse_top_comments(com.comments(), df_dict, sub_dict)
+            print('Expanding comment tree. . . ')
+            parse_top_comments(com.comments(), df_dict, sub_dict)
         elif com.stickied:
             continue # Sticked comments are usually moderator messages. Ignore.
         else:
             com_details = {'com_id': com.id, 
-                           'upvotes': com.ups, 
-                           'downvotes': com.downs,
+                           'com_created': com.created_utc,
+                           'com_upvotes': com.ups, 
+                           'com_downvotes': com.downs,
                            'com_author': str(com.author),
-                           'com_text': None }
+                           'com_text': None,
+
+                           # delta status and giver can possibly be updated
+                           'com_delta_status': 0,
+                           'com_delta_giver': None,
+                           'com_delta_reason': None
+                           }
             hlink = r'http.*'
             com_text = re.sub(hlink, '', com.body)
             com_details['com_text'] = com_text
 
             parse_replies(com.replies, df_dict, sub_dict, com_details)
+            
 
 def parse_replies(reply_tree, df_dict, sub_dict, com_dict):
     '''
     '''
     reply_tree.replace_more(limit = None)
-    for reply in reply_tree:
+    print('\tEntering reply tree. . .')
+    for reply in reply_tree.list():
+        if str(reply.author) == 'DeltaBot':
+            parse_delta_bot_comment(reply, df_dict, sub_dict, com_dict)
+    return(None)
 
 
-
-def parse_delta_bot_comment(comment, df_dict, sub_dict):
+def parse_delta_bot_comment(comment, df_dict, sub_dict, com_dict):
     '''
     '''
-    pass
+    text = comment.body
+    if 'Confirmed' in text:
+        # Extract username
+        uname_pat = r'/u/([^\s.]*)'
+        uname = re.findall(uname_pat, text)
+        uname = uname[0]
+
+        # Check that comment username matches DeltaBot username (thoroughness)
+        if uname != com_dict['com_author']:
+            print('Try to prevent this')
+            return(None)
+        
+        update_df_dict(comment.parent(), df_dict, sub_dict, com_dict)
+    else:
+        # See what other types of comment types DeltaBot has.
+        # Can possibly update to classify the distinct types of comments
+        print(comment.body)
+
+
+def update_df_dict(parent_comment, df_dict, sub_dict, com_dict):
+    '''
+    '''
+    # df_dict = {'com_id': [], 'com_created': [], 'com_upvotes': [], 'com_downvotes': [], 'com_author': [], 'com_text': [],
+    #            'com_delta_status': [], 'sub_id': [], 'sub_created': [], 'sub_author': [], 'sub_title': [], 'sub_text': []} 
+    delta_giver = str(parent_comment.author)
+
+    # Comments that successfully bestow deltas should have an reason for 
+    # why the delta was given, we will extract the whole comment to see if we 
+    # can capture it
+    dg_reason = parent_comment.body 
+
+    com_dict['com_delta_reason'] = dg_reason
+    com_dict['com_delta_giver'] = delta_giver
+
+    if delta_giver == sub_dict['sub_author']:
+        com_dict['com_delta_status'] = 2 # 2 Indicates the delta is from OP
+    else:
+        com_dict['com_delta_status'] = 1 # 1 Indicates the delta is not from OP
+    
+    for col_name in df_dict.keys():
+        category = col_name[:3]
+        if category == 'sub':
+            df_dict[col_name].append(sub_dict[col_name])
+        elif category == 'com':
+            df_dict[col_name].append(com_dict[col_name])
+        else:
+            print(col_name)
+            raise Exception('This should not be happening, coach')
+
 
 if __name__ == '__main__':
     reddit = praw.Reddit('ccanal', # Site ID
                          user_agent = '/u/shugamoe content analysis scraper',
                          )
-    # for cid, name in zip(CORPS, CNAMES):
-    #     sub_to_df(reddit, cid, name)
-    # reddit.read_only = True # Don't want to accidentally do stuff
-    # reddit, ids  = get_top_archived()
-    # df = parse_submissions(reddit, ids, .1)
-    # df.to_pickle('cmv_sample.pkl')
