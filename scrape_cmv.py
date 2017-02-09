@@ -208,7 +208,7 @@ def top_com_info(reddit, num_posts):
     time.sleep(2)
     df_dict = { # Comment attributes
                'com_id': [], 'com_created': [], 'com_upvotes': [], 'com_downvotes': [], 'com_author': [], 'com_text': [],
-               'com_delta_status': [], 'com_delta_giver': [], 
+               'com_delta_received': [], 'com_delta_giver': [], 'com_delta_from_op': [],
 
                # Original post attributes
                'sub_id': [], 'sub_created': [], 'sub_author': [], 'sub_title': [], 'sub_text': []}
@@ -267,9 +267,10 @@ def parse_top_comments(comment_tree, df_dict, sub_dict):
                            'com_text': None,
 
                            # delta status and giver can possibly be updated
-                           'com_delta_status': 0,
+                           'com_delta_status': False,
                            'com_delta_giver': None,
                            'com_delta_reason': None
+                           'com_delta_from_op': None
                            }
             hlink = r'http.*'
             com_text = re.sub(hlink, '', com.body)
@@ -284,10 +285,20 @@ def parse_replies(reply_tree, df_dict, sub_dict, com_dict):
     print('Expanding reply tree. . . ')
     reply_tree.replace_more(limit = None)
     print('\tEntering reply tree. . .')
+
+
+    com_received_delta = False
     for reply in reply_tree.list():
         if str(reply.author) == 'DeltaBot':
-            parse_delta_bot_comment(reply, df_dict, sub_dict, com_dict)
+            reply_gave_delta = parse_delta_bot_comment(reply, df_dict, sub_dict, com_dict)
+        # If the reply gave a delta, then we can say that the comment received
+        # a delta.
+        if reply_gave_delta:
+            com_received_delta = True
 
+    # If the comment did not receive a delta, we still want to record it
+    if not com_received_delta:
+        update_df_dict(None, df_dict, sub_dict, com_dict, delta_given = False)
 
     return(None)
 
@@ -307,15 +318,19 @@ def parse_delta_bot_comment(comment, df_dict, sub_dict, com_dict):
             print('Try to prevent this')
             return(None)
         
-        update_df_dict(comment.parent(), df_dict, sub_dict, com_dict)
+        update_df_dict(comment.parent(), df_dict, sub_dict, com_dict, delta_given = True)
+        delta_given = True
     else:
         # See what other types of comment types DeltaBot has.
         # Can possibly update to classify the distinct types of comments past
         # just printing.
         print(comment.body)
+        delta_given = False
+
+    return(delta_given)
 
 
-def update_df_dict(parent_comment, df_dict, sub_dict, com_dict):
+def update_df_dict(parent_comment, df_dict, sub_dict, com_dict, delta_given):
     '''
     '''
     # df_dict = {'com_id': [], 'com_created': [], 'com_upvotes': [], 'com_downvotes': [], 'com_author': [], 'com_text': [],
@@ -328,20 +343,20 @@ def update_df_dict(parent_comment, df_dict, sub_dict, com_dict):
         # why the delta was given, we will extract the whole comment to see if we 
         # can capture it
         dg_reason = parent_comment.body 
-
+        
         com_dict['com_delta_reason'] = dg_reason
         com_dict['com_delta_giver'] = delta_giver
+        com_dict['com_delta_received'] = True
     else:
         print('Recording comment (no delta)')
         delta_giver = None
 
     if delta_giver == sub_dict['sub_author']:
         print('Recording comment (delta from OP)')
-        com_dict['com_delta_status'] = 2 # 2 Indicates the delta is from OP
+        com_dict['com_delta_from_op'] = True # 2 Indicates the delta is from OP
     elif not delta_giver:
         print('Recording comment (delta not from OP)')
-        com_dict['com_delta_status'] = 1 # 1 Indicates the delta is not from OP
-    
+
     for col_name in df_dict.keys():
         category = col_name[:3]
         if category == 'sub':
