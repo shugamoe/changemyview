@@ -291,6 +291,10 @@ def parse_replies(reply_tree, df_dict, sub_dict, com_dict):
     for reply in reply_tree.list():
         if str(reply.author) == 'DeltaBot':
             reply_gave_delta = parse_delta_bot_comment(reply, df_dict, sub_dict, com_dict)
+        else:
+            # If comment not from dbot, no chance it gave delta
+            reply_gave_delta = False 
+            
         # If the reply gave a delta, then we can say that the comment received
         # a delta.
         if reply_gave_delta:
@@ -357,7 +361,7 @@ def update_df_dict(parent_comment, df_dict, sub_dict, com_dict, delta_given):
     else:
         print('Recording comment (no delta)')
         delta_giver = None
-        
+
     for col_name in df_dict.keys():
         category = col_name[:3]
         if category == 'sub':
