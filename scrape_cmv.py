@@ -269,8 +269,8 @@ def parse_top_comments(comment_tree, df_dict, sub_dict):
                            # delta status and giver can possibly be updated
                            'com_delta_status': False,
                            'com_delta_giver': None,
-                           'com_delta_reason': None
-                           'com_delta_from_op': None
+                           'com_delta_reason': None,
+                           'com_delta_from_op': None,
                            }
             hlink = r'http.*'
             com_text = re.sub(hlink, '', com.body)
@@ -343,19 +343,20 @@ def update_df_dict(parent_comment, df_dict, sub_dict, com_dict, delta_given):
         # why the delta was given, we will extract the whole comment to see if we 
         # can capture it
         dg_reason = parent_comment.body 
-        
+
         com_dict['com_delta_reason'] = dg_reason
         com_dict['com_delta_giver'] = delta_giver
         com_dict['com_delta_received'] = True
+
+        if delta_giver == sub_dict['sub_author']:
+            com_dict['com_delta_from_op'] = True 
+            print('Recording comment (delta from OP)')
+        else not delta_giver:
+            com_dict['com_delta_from_op'] = False 
+            print('Recording comment (delta not from OP)')
     else:
         print('Recording comment (no delta)')
         delta_giver = None
-
-    if delta_giver == sub_dict['sub_author']:
-        print('Recording comment (delta from OP)')
-        com_dict['com_delta_from_op'] = True # 2 Indicates the delta is from OP
-    elif not delta_giver:
-        print('Recording comment (delta not from OP)')
 
     for col_name in df_dict.keys():
         category = col_name[:3]
