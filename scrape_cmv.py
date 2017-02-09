@@ -351,13 +351,13 @@ def update_df_dict(parent_comment, df_dict, sub_dict, com_dict, delta_given):
         if delta_giver == sub_dict['sub_author']:
             com_dict['com_delta_from_op'] = True 
             print('Recording comment (delta from OP)')
-        else not delta_giver:
+        else:
             com_dict['com_delta_from_op'] = False 
             print('Recording comment (delta not from OP)')
     else:
         print('Recording comment (no delta)')
         delta_giver = None
-
+r
     for col_name in df_dict.keys():
         category = col_name[:3]
         if category == 'sub':
