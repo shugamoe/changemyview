@@ -237,7 +237,9 @@ def top_com_info(reddit, num_posts):
         print('{} subs parsed ({:.3f}%)'.format(sub_count, 100 * sub_count / sub_total))
 
     # Create and output the dataframe
-    df = pd.DataFrame(df_dict, index = df_dict['com_id'])
+    # We do not have comment id as an index because a comment can receive 
+    # multiple deltas.
+    df = pd.DataFrame(df_dict) # index = df_dict['com_id'])
     df['com_created'] = pd.to_datetime(df['com_created'],unit='s')
     df['sub_created'] = pd.to_datetime(df['sub_created'],unit='s')
 
@@ -306,7 +308,8 @@ def parse_delta_bot_comment(comment, df_dict, sub_dict, com_dict):
         update_df_dict(comment.parent(), df_dict, sub_dict, com_dict)
     else:
         # See what other types of comment types DeltaBot has.
-        # Can possibly update to classify the distinct types of comments
+        # Can possibly update to classify the distinct types of comments past
+        # just printing.
         print(comment.body)
 
 
