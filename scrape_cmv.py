@@ -287,6 +287,8 @@ def parse_replies(reply_tree, df_dict, sub_dict, com_dict):
     for reply in reply_tree.list():
         if str(reply.author) == 'DeltaBot':
             parse_delta_bot_comment(reply, df_dict, sub_dict, com_dict)
+
+
     return(None)
 
 
@@ -318,19 +320,26 @@ def update_df_dict(parent_comment, df_dict, sub_dict, com_dict):
     '''
     # df_dict = {'com_id': [], 'com_created': [], 'com_upvotes': [], 'com_downvotes': [], 'com_author': [], 'com_text': [],
     #            'com_delta_status': [], 'sub_id': [], 'sub_created': [], 'sub_author': [], 'sub_title': [], 'sub_text': []} 
-    delta_giver = str(parent_comment.author)
+    
+    if delta_given:
+        delta_giver = str(parent_comment.author)
 
-    # Comments that successfully bestow deltas should have an reason for 
-    # why the delta was given, we will extract the whole comment to see if we 
-    # can capture it
-    dg_reason = parent_comment.body 
+        # Comments that successfully bestow deltas should have an reason for 
+        # why the delta was given, we will extract the whole comment to see if we 
+        # can capture it
+        dg_reason = parent_comment.body 
 
-    com_dict['com_delta_reason'] = dg_reason
-    com_dict['com_delta_giver'] = delta_giver
+        com_dict['com_delta_reason'] = dg_reason
+        com_dict['com_delta_giver'] = delta_giver
+    else:
+        print('Recording comment (no delta)')
+        delta_giver = None
 
     if delta_giver == sub_dict['sub_author']:
+        print('Recording comment (delta from OP)')
         com_dict['com_delta_status'] = 2 # 2 Indicates the delta is from OP
-    else:
+    elif not delta_giver:
+        print('Recording comment (delta not from OP)')
         com_dict['com_delta_status'] = 1 # 1 Indicates the delta is not from OP
     
     for col_name in df_dict.keys():
