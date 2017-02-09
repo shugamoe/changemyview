@@ -267,7 +267,7 @@ def parse_top_comments(comment_tree, df_dict, sub_dict):
                            'com_text': None,
 
                            # delta status and giver can possibly be updated
-                           'com_delta_status': False,
+                           'com_delta_received': False,
                            'com_delta_giver': None,
                            'com_delta_reason': None,
                            'com_delta_from_op': None,
@@ -294,7 +294,7 @@ def parse_replies(reply_tree, df_dict, sub_dict, com_dict):
         else:
             # If comment not from dbot, no chance it gave delta
             reply_gave_delta = False 
-            
+
         # If the reply gave a delta, then we can say that the comment received
         # a delta.
         if reply_gave_delta:
@@ -337,9 +337,6 @@ def parse_delta_bot_comment(comment, df_dict, sub_dict, com_dict):
 def update_df_dict(parent_comment, df_dict, sub_dict, com_dict, delta_given):
     '''
     '''
-    # df_dict = {'com_id': [], 'com_created': [], 'com_upvotes': [], 'com_downvotes': [], 'com_author': [], 'com_text': [],
-    #            'com_delta_status': [], 'sub_id': [], 'sub_created': [], 'sub_author': [], 'sub_title': [], 'sub_text': []} 
-    
     if delta_given:
         delta_giver = str(parent_comment.author)
 
