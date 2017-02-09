@@ -357,7 +357,7 @@ def update_df_dict(parent_comment, df_dict, sub_dict, com_dict, delta_given):
     else:
         print('Recording comment (no delta)')
         delta_giver = None
-r
+        
     for col_name in df_dict.keys():
         category = col_name[:3]
         if category == 'sub':
