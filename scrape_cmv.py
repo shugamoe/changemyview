@@ -195,7 +195,7 @@ def get_top_archived(subreddit, num_posts):
     return(archived_ids)
 
 
-def top_com_info(reddit, num_posts):
+def top_com_info(reddit, num_posts, subreddit, df_name):
     '''
     This function makes a pandas dataframe that collects information for each 
     top comment from a sample of submission from /r/changemyview.
@@ -204,7 +204,7 @@ def top_com_info(reddit, num_posts):
     was awarded or not (1, 0), and whether a delta was awarded by the original
     poster (2), as well as the text of the question and the title of the question.
     '''
-    submission_ids = get_top_archived('changemyview', num_posts)
+    submission_ids = get_top_archived(subreddit, num_posts)
     time.sleep(2)
     df_dict = { # Comment attributes
                'com_id': [], 'com_created': [], 'com_upvotes': [], 'com_downvotes': [], 'com_author': [], 'com_text': [],
@@ -243,7 +243,7 @@ def top_com_info(reddit, num_posts):
     df['com_created'] = pd.to_datetime(df['com_created'],unit='s')
     df['sub_created'] = pd.to_datetime(df['sub_created'],unit='s')
 
-    df.to_pickle('test_projdat.pkl')
+    df.to_pickle('{}.pkl'.format(df_name))
     print('Dataframe written')
     return(None)
 
