@@ -1,4 +1,4 @@
-# Because I was too lazy to create separate data tables, this is a file 
+# Because I was too lazy to create separate data tables, this is a file
 # to transform the dataframe containing our information into different forms
 
 import pandas as pd
@@ -12,10 +12,12 @@ def get_clean_data():
     '''
     data = pd.read_pickle('top_posts831.pkl')
     df = data.drop_duplicates(['com_id'], keep = 'first').set_index('com_id')
-    df = df.loc[:,['sub_text','com_text','com_delta_received', 'com_delta_from_op', 'com_upvotes']]
+    df = df.loc[:,['sub_text','com_text','com_delta_received', 'com_delta_from_op', 'com_upvotes', 'sub_id']]
     df['com_delta_from_op']= df['com_delta_from_op'].apply(lambda x: False if x==None else x==True)
 
     df.dropna(axis=0, how='any', inplace = True)
+
+    df = df[(df['com_text'] != '[removed]') & (df['com_text'] != '[deleted]')]
 
     return(df)
 
@@ -39,17 +41,17 @@ def normlizeTokens(tokenLst, stopwordLst = None, stemmer = None, lemmer = None):
     #Now we can use the semmer, if provided
     if stemmer is not None:
         workingIter = (stemmer.stem(w) for w in workingIter)
-        
+
     #And the lemmer
     if lemmer is not None:
         workingIter = (lemmer.lemmatize(w) for w in workingIter)
-    
+
     #And remove the stopwords
     if stopwordLst is not None:
         workingIter = (w for w in workingIter if w not in stopwordLst)
     #We will return a list with the stopwords removed
     return list(workingIter)
-    
+
 
 # From http://stackoverflow.com/questions/15880133/jensen-shannon-divergence
 def jsdiv(P, Q):
@@ -90,7 +92,7 @@ def calc_JS_divergence(string1, string2):
     '''
     norm_toks1 = normlizeTokens(nltk.word_tokenize(string1), stopwordLst = stop_words_nltk, stemmer =  snowball)
     norm_toks2 = normlizeTokens(nltk.word_tokenize(string2), stopwordLst = stop_words_nltk, stemmer =  snowball)
-    
+
     words1 = set(norm_toks1)
     words2 = set(norm_toks2)
 
