@@ -66,18 +66,24 @@ parser = stanford.StanfordParser(parserJarPath, parserModelsPath, modelPath)
 depParser = stanford.StanfordDependencyParser(parserJarPath, parserModelsPath)
 
 
-def main():
+def main(test = False):
     '''
     Try and parse the comment text of the dataframe.
     '''
     cmv_df = get_clean_data()
+    tot_coms = len(cmv_df)
+    tracker = {'comments_left': tot_coms}
+
+    if test:
+        cmv_df = cmv_df.sample(n = 2)
     cmv_df['sentences'] = cmv_df['com_text'].apply(lambda x: [nltk.word_tokenize(s) for s in nltk.sent_tokenize(x)])
-    # cmv_df['com_avg_pt_depth']
+    cmv_df = cmv_df[['sentences']]
 
-    return(cmv_df)
+    cmv_df['com_avg_pt_depth'] = cmv_df['sentences'].apply(lambda x: calc_avg_parse_depth(x, tracker))
+    cmv_df.to_pickle('com_avg_pt_depth.pkl')
 
 
-def calc_avg_parse_depth(sentences):
+def calc_avg_parse_depth(sentences, tracker):
     '''
     '''
     parses = list(parser.parse_sents(sentences))
@@ -92,10 +98,12 @@ def calc_avg_parse_depth(sentences):
 
     avg_height = cum_height / tot_trees
 
+    tracker['comments_left'] -= 1
+    if tracker['comments_left'] % 5 == 0:
+        print('{} comments left'.format(tracker['comments_left']))
+
     return(avg_height)
 
 
-
-
 if __name__ == '__main__':
-    cmv_df = main()
+    pass
