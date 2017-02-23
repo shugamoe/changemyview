@@ -95,8 +95,10 @@ def calc_avg_parse_depth(sentences, tracker):
         tree = thing[0]
 
         cum_height += tree.height()
-
-    avg_height = cum_height / tot_trees
+        if tot_trees != 0:
+            avg_height = cum_height / tot_trees
+        else:
+            avg_height = 0
 
     tracker['comments_left'] -= 1
     if tracker['comments_left'] % 5 == 0:
