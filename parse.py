@@ -62,7 +62,7 @@ if not os.path.isfile(modelPath):
         with open(modelPath, 'wb') as f:
             f.write(zf.read('edu/stanford/nlp/models/lexparser/{}'.format(modelName)))
 
-parser = stanford.StanfordParser(parserJarPath, parserModelsPath, modelPath)
+parser = stanford.StanfordParser(parserJarPath, parserModelsPath, modelPath, java_options = '-Xmx30G')
 depParser = stanford.StanfordDependencyParser(parserJarPath, parserModelsPath)
 
 
@@ -86,7 +86,12 @@ def main(test = False):
 def calc_avg_parse_depth(sentences, tracker):
     '''
     '''
-    parses = list(parser.parse_sents(sentences))
+    try:
+        parses = list(parser.parse_sents(sentences))
+    except Exception as e:
+        print('Java Parser is fickle: {}'.format(e))
+        return(None)
+
 
     tot_trees, cum_height = 0, 0
     for thing in parses:

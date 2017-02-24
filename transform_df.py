@@ -47,13 +47,17 @@ def get_clean_data():
 
     return(df)
 
-df = get_clean_data()
-df['tokenized_com'] = df['com_text'].apply(lambda x: nltk.word_tokenize(x))
-df['normalized_com'] = df['tokenized_com'].apply(lambda x: normlizeTokens(x, stopwordLst = stop_words_nltk, stemmer = snowball))
+    
+if __name__ == '__main__':
+    df = get_clean_data()
+    df['tokenized_com'] = df['com_text'].apply(lambda x: nltk.word_tokenize(x))
+    df['normalized_com'] = df['tokenized_com'].apply(lambda x: normlizeTokens(x, stopwordLst = stop_words_nltk, stemmer = snowball))
 
-df['tokenized_sub'] = df['sub_text'].apply(lambda x: nltk.word_tokenize(x))
-df['normalized_sub'] = df['tokenized_sub'].apply(lambda x: normlizeTokens(x, stopwordLst = stop_words_nltk, stemmer = snowball))
+    df['tokenized_sub'] = df['sub_text'].apply(lambda x: nltk.word_tokenize(x))
+    df['normalized_sub'] = df['tokenized_sub'].apply(lambda x: normlizeTokens(x, stopwordLst = stop_words_nltk, stemmer = snowball))
 
-df.to_pickle("cmv_data.pkl")
+    df.to_pickle("cmv_data.pkl")
+
+
     
 
