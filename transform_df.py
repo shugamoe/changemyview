@@ -5,14 +5,16 @@ import pandas as pd
 import nltk
 from nltk.corpus import stopwords #For stopwords
 import numpy as np
+import os
 
 stop_words_nltk = stopwords.words('english')
 #stop_words = ["the","it","she","he", "a"] #Uncomment this line if you want to use your own list of stopwords.
 
-#The stemmers and lemmers need to be initialized before bing run
+#The stemmers and lemmers need to be initialized before being run
 porter = nltk.stem.porter.PorterStemmer()
 snowball = nltk.stem.snowball.SnowballStemmer('english')
 wordnet = nltk.stem.WordNetLemmatizer()
+
 
 def normlizeTokens(tokenLst, stopwordLst = None, stemmer = None, lemmer = None):
     #We can use a generator here as we just need to iterate over it
@@ -34,6 +36,7 @@ def normlizeTokens(tokenLst, stopwordLst = None, stemmer = None, lemmer = None):
     #We will return a list with the stopwords removed
     return list(workingIter)
 
+
 def get_clean_data():
     '''
     '''
@@ -49,15 +52,30 @@ def get_clean_data():
 
     
 if __name__ == '__main__':
+    print('Getting clean data. . .')
     df = get_clean_data()
+
+    print('Tokenizing Comments. . . ')
     df['tokenized_com'] = df['com_text'].apply(lambda x: nltk.word_tokenize(x))
+    print('Normalizing Comments. . . ')
     df['normalized_com'] = df['tokenized_com'].apply(lambda x: normlizeTokens(x, stopwordLst = stop_words_nltk, stemmer = snowball))
 
+    print('Tokenizing submission text. . . ')
     df['tokenized_sub'] = df['sub_text'].apply(lambda x: nltk.word_tokenize(x))
+    print('Normalizing submission text. . . ')
     df['normalized_sub'] = df['tokenized_sub'].apply(lambda x: normlizeTokens(x, stopwordLst = stop_words_nltk, stemmer = snowball))
 
-    df.to_pickle("cmv_data.pkl")
+    # Merge in Average Parse Tree Depth
+    print('Merging in average Phase Tree Depth (Sentence Complexity). . .')
+    pt_df = pd.read_pickle('com_avg_pt_depth.pkl')
 
+    df = df.join(pt_df)
+    df.dropna(axis=0, how='any', inplace=True)
 
-    
+    # Write file
+    fname = "cmv_data.pkl"
+    df.to_pickle(fname)
+    print('File written as {} in current directory'.format(fname))
 
+    # This takes a long time, this plays a sound to tell me it's done.
+    os.system('espeak "Data cleaned."')
