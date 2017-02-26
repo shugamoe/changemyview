@@ -207,13 +207,13 @@ def determine_cluster_num(reduced_data, num_components, max_clusts):
     '''
     #First, let's use Silhouette method to find optimal number of clusters
     num_cluster_s_scores = {num_cluster: None for 
-    num_cluster in list(range(1, max_clusts + 1))}
+    num_cluster in list(range(2, max_clusts + 1))}
     X = reduced_data[:, :num_components]
 
     for n_clusters in num_cluster_s_scores:
         # Initialize the clusterer with n_clusters value and a random generator
-        # seed of 69 for reproducibility.
-        clusterer = sklearn.cluster.KMeans(n_clusters=n_clusters, random_state=69)
+        # seed of 117 for reproducibility.
+        clusterer = sklearn.cluster.KMeans(n_clusters=n_clusters, random_state=117)
         cluster_labels = clusterer.fit_predict(X)
 
         # The silhouette_score gives the average value for all the samples.
@@ -225,8 +225,49 @@ def determine_cluster_num(reduced_data, num_components, max_clusts):
 
     ideal_clust_num = sorted(num_cluster_s_scores.items(), 
                              key = lambda kv: kv[1], reverse = True)[0]
+    return(15)
 
-    return(ideal_clust_num)
+
+def run_clustering(TFVectorizer, subTFVects, num_clusters):
+    '''
+    '''
+    #It seems that when number of n_clusters is set to 10, it has the highest silhouette_score, 0.175818902297.
+    #k-means++ is a better way of finding the starting points
+    #We could also try providing our own
+    km = sklearn.cluster.KMeans(n_clusters=num_clusters, init='k-means++')
+    km.fit(subTFVects)
+
+    #contents of the clusters
+    terms = TFVectorizer.get_feature_names()
+    # print("Top terms per cluster:")
+    order_centroids = km.cluster_centers_.argsort()[:, ::-1]
+    labels = []
+    for i in range(num_clusters):
+        # print("Cluster %d:" % i)
+        label = ''
+        for ind in order_centroids[i, :10]:
+            # print(' %s' % terms[ind])
+            label += terms[ind]+" "
+        # print('\n')
+        labels.append(label)
+
+    return(labels, km)
+
+
+def get_cluster_proportions(sub_df, labels):
+    '''
+    '''
+    cluster = []
+    percent = []
+    for i in range(len(labels)):
+        cluster.append(labels[i])
+        proportion = sub_df[sub_df['kmeans'] == i].shape[0]/sub_df.shape[0]
+        percent.append(proportion)
+    d = {'kmeans_num':np.array(range(len(labels))), 'kmeans_inter': cluster, 'proportion': percent}
+    kmDF = pd.DataFrame(data = d).sort(['proportion'], ascending=[0])
+
+    return(kmDF)
+
 
        
 
@@ -238,7 +279,7 @@ def main(test = True):
 
     if test:
         print('Test mode (Only using fraction of data)')
-        df = df.sample(frac = .1, random_state = 69)
+        df = df.sample(frac = .1, random_state = 117)
 
     '''
     K-means clustering on submission topics
@@ -254,8 +295,17 @@ def main(test = True):
     pca = PCA().fit(subTFVects.toarray())
     reduced_data = pca.transform(subTFVects.toarray())
 
+    clus_num = determine_cluster_num(reduced_data, 15, 20)
+    
+    labels, km = run_clustering(TFVectorizer, subTFVects, clus_num)
+    
+    sub_df['kmeans'] = km.labels_
+    sub_df['kmeans_inter'] = sub_df['kmeans'].apply(lambda x: labels[x])
 
 
+    prop_df = get_cluster_proportions(sub_df, labels)
+    
+    df = df.merge(sub_df[['sub_id', 'kmeans', 'kmeans_inter']], on = 'sub_id', how = 'inner')
 
     # getting KL and JS columns
     print('Calculating KL and JS Divergences')
@@ -263,9 +313,16 @@ def main(test = True):
     df['JS'] = df.apply(lambda x: calc_JS_divergence(x['sub_text'], x['com_text']), axis = 1)
 
 
+    fname = 'cmv_full_features.pkl'
+    print('Exporting to {}'.format(fname))
+    df.to_pickle('{}'.format(fname))
+
+    prop_name = 'cmv_cluster_info.pkl'
+    print('Exporting df on cluster proportions to {}'.format(prop_name))
+    prop_df.to_pickle('{}'.format(prop_name))
 
 
 if __name__ == '__main__':
-    # main()
+    main(False)
     pass
 
