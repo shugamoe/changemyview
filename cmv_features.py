@@ -50,6 +50,7 @@ import seaborn as sns #makes our plots look nicer
 from nltk.corpus import stopwords #For stopwords
 import os #For making directories
 import io #for making http requests look like files
+from transform_df import normlizeTokens, stop_words_nltk, porter, snowball, wordnet
 
 
 #KL functions
@@ -65,6 +66,7 @@ def makeProbsArray(dfColumn, overlapDict):
     countArray = np.array(countList)
     return countArray / countArray.sum()
 
+
 def comparison(df_a, df_b):
     words_a = set(df_a['normalized_com'].sum())
     words_b = set(df_a['normalized_com'].sum())
@@ -76,9 +78,10 @@ def comparison(df_a, df_b):
     aProbArray = makeProbsArray(df_a['normalized_com'], overlapWordsDict)
     bProbArray = makeProbsArray(df_b['normalized_com'], overlapWordsDict)
     return (aProbArray, bProbArray,overlapWordsDict)
+
+
 def _kldiv(A, B):
     return np.sum([v for v in A * np.log2(A/B) if not np.isnan(v)])
-
 
 
 def make_prob_array(norm_toks, overlap_dict):
@@ -111,6 +114,7 @@ def calc_kl_divergence(string1, string2):
 
     kl_div = _kldiv(prob1, prob2)
     return(kl_div)
+
 
 #JS functions
 # From http://stackoverflow.com/questions/15880133/jensen-shannon-divergence
@@ -165,18 +169,103 @@ def calc_JS_divergence(string1, string2):
     js_div = jsdiv(prob1, prob2)
     return(js_div)
 
-try:
-    df = pandas.read_pickle('data/cmv_data.pkl')
-    #edf = pandas.read_pickle('data/extrap.pkl')
-except:
+
+def scree_plot(subTFVects):
+    #First, use PCA to reduce the feature matrix
+    PCA = sklearn.decomposition.PCA
+    pca = PCA().fit(subTFVects.toarray())
+    reduced_data = pca.transform(subTFVects.toarray())
+
+    #use scree plot to determine the number of dimensions
+    n = subTFVects.shape[0]
+    fig = plt.figure(figsize=(12,5))
+    ax1 = fig.add_subplot(121)
+    eigen_vals = np.arange(n) + 1
+
+    #print(pca.explained_variance_ratio_)
+    print (eigen_vals.shape)
+    print(pca.explained_variance_ratio_.shape)
+
+    ax1.plot(eigen_vals, pca.explained_variance_ratio_, 'ro-', linewidth=2)
+    ax1.set_title('Scree Plot')
+    ax1.set_xlabel('Principal Component')
+    ax1.set_ylabel('Proportion of Explained Variance')
+
+    ax2 = fig.add_subplot(122)
+    eigen_vals = np.arange(20) + 1
+    ax2.plot(eigen_vals, pca.explained_variance_ratio_[:20], 'ro-', linewidth=2)
+    ax2.set_title('Scree Plot (First 20 Principal Components)')
+    ax2.set_xlabel('Principal Component')
+    ax2.set_ylabel('Proportion of Explained Variance')
+    plt.show()
+
+    return(None)
+
+
+def determine_cluster_num(reduced_data, num_components, max_clusts):
+    '''
+    '''
+    #First, let's use Silhouette method to find optimal number of clusters
+    num_cluster_s_scores = {num_cluster: None for 
+    num_cluster in list(range(1, max_clusts + 1))}
+    X = reduced_data[:, :num_components]
+
+    for n_clusters in num_cluster_s_scores:
+        # Initialize the clusterer with n_clusters value and a random generator
+        # seed of 69 for reproducibility.
+        clusterer = sklearn.cluster.KMeans(n_clusters=n_clusters, random_state=69)
+        cluster_labels = clusterer.fit_predict(X)
+
+        # The silhouette_score gives the average value for all the samples.
+        # This gives a perspective into the density and separation of the formed
+        # clusters
+        silhouette_avg = sklearn.metrics.silhouette_score(X, cluster_labels)
+        
+        num_cluster_s_scores[n_clusters] = silhouette_avg
+
+    ideal_clust_num = sorted(num_cluster_s_scores.items(), 
+                             key = lambda kv: kv[1], reverse = True)[0]
+
+    return(ideal_clust_num)
+
+       
+
+def main(test = True):
+    '''
+    '''
+    print('Reading in dataframe')
     df = pandas.read_pickle('cmv_data.pkl')
-    #edf = pandas.read_pickle('extrap.pkl')
 
-#df = df.sample(frac = .1)
+    if test:
+        print('Test mode (Only using fraction of data)')
+        df = df.sample(frac = .1, random_state = 69)
 
-#getting KL and JS columns
-df['tuple'] = list(zip(df['sub_text'], df['com_text']))
-df['KL'] = df['tuple'].apply(lambda x: calc_kl_divergence(x[0], x[1]))
-df['JS'] = df['tuple'].apply(lambda x: calc_JS_divergence(x[0], x[1]))
+    '''
+    K-means clustering on submission topics
+    '''
+    sub_df = df[['sub_id','sub_text']].drop_duplicates()
 
-#df.to_pickle("features_data.pkl")
+    #initialize tf-idf feature matrix
+    TFVectorizer = sklearn.feature_extraction.text.TfidfVectorizer(max_df=0.5, max_features=1000, min_df=3, stop_words='english', norm='l2')
+    #train
+    subTFVects = TFVectorizer.fit_transform(sub_df['sub_text'])
+
+    PCA = sklearn.decomposition.PCA
+    pca = PCA().fit(subTFVects.toarray())
+    reduced_data = pca.transform(subTFVects.toarray())
+
+
+
+
+    # getting KL and JS columns
+    print('Calculating KL and JS Divergences')
+    df['KL'] = df.apply(lambda x: calc_kl_divergence(x['sub_text'], x['com_text']), axis = 1)
+    df['JS'] = df.apply(lambda x: calc_JS_divergence(x['sub_text'], x['com_text']), axis = 1)
+
+
+
+
+if __name__ == '__main__':
+    # main()
+    pass
+

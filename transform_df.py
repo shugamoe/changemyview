@@ -42,7 +42,7 @@ def get_clean_data():
     '''
     data = pd.read_pickle('top_posts831.pkl')
     df = data.drop_duplicates(['com_id'], keep = 'first').set_index('com_id')
-    df = df.loc[:,['sub_text','com_text','com_delta_received', 'com_delta_from_op', 'com_upvotes']]
+    df = df.loc[:,['sub_text','com_text','com_delta_received', 'com_delta_from_op', 'com_upvotes', 'sub_id']]
     df['com_delta_from_op']= df['com_delta_from_op'].apply(lambda x: False if x==None else x==True)
 
     df.dropna(axis=0, how='any', inplace = True)
@@ -55,22 +55,25 @@ if __name__ == '__main__':
     print('Getting clean data. . .')
     df = get_clean_data()
 
+    # Merge in Average Parse Tree Depth
+    print('Merging in average Phase Tree Depth (Sentence Complexity). . .')
+    pt_df = pd.read_pickle('com_avg_pt_depth.pkl')
+    df = df.join(pt_df)
+    df.dropna(axis=0, how='any', inplace=True)
+
+    print('Tokenizing submission text. . . ')
+    sub_df = df[['sub_id','sub_text']].drop_duplicates()
+    sub_df['tokenized_sub'] = sub_df['sub_text'].apply(lambda x: nltk.word_tokenize(x))
+    print('Normalizing submission text. . . ')
+    sub_df['normalized_sub'] = sub_df['tokenized_sub'].apply(lambda x: normlizeTokens(x, stopwordLst = stop_words_nltk, stemmer = snowball))
+    df = df.merge(sub_df, on = 'sub_id', how = 'inner')
+    df.drop('sub_text_x', 1, inplace = True)
+    df = df.rename(index = str, columns = {'sub_text_y': 'sub_text'})
+
     print('Tokenizing Comments. . . ')
     df['tokenized_com'] = df['com_text'].apply(lambda x: nltk.word_tokenize(x))
     print('Normalizing Comments. . . ')
     df['normalized_com'] = df['tokenized_com'].apply(lambda x: normlizeTokens(x, stopwordLst = stop_words_nltk, stemmer = snowball))
-
-    print('Tokenizing submission text. . . ')
-    df['tokenized_sub'] = df['sub_text'].apply(lambda x: nltk.word_tokenize(x))
-    print('Normalizing submission text. . . ')
-    df['normalized_sub'] = df['tokenized_sub'].apply(lambda x: normlizeTokens(x, stopwordLst = stop_words_nltk, stemmer = snowball))
-
-    # Merge in Average Parse Tree Depth
-    print('Merging in average Phase Tree Depth (Sentence Complexity). . .')
-    pt_df = pd.read_pickle('com_avg_pt_depth.pkl')
-
-    df = df.join(pt_df)
-    df.dropna(axis=0, how='any', inplace=True)
 
     # Write file
     fname = "cmv_data.pkl"
