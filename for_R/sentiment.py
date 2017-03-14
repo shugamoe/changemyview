@@ -46,6 +46,12 @@ if __name__ == '__main__':
     #     nltk.sent_tokenize(x)a
     # cmv_df.to_pickle('../cmv_full_features.pkl')
 
+    words_in2 = ['make', 'don', 'just', 'point', 'lot', 'does']
+    for word in words_in2:
+        cmv_df[word] = cmv_df["com_text"].apply(lambda x: word in x)
+
+
+
     scores = calc_comment_sentiment(cmv_df['scoreable_sents'])
 
     for metric in scores:
@@ -53,7 +59,7 @@ if __name__ == '__main__':
 
     cmv_df[['com_delta_received', 'com_upvotes', 'com_avg_pt_depth', 'kmeans', 
     'kmeans_inter', 'KL', 'JS', 'com_length', 'com_neg', 'com_neu', 
-    'com_pos']].to_csv('changemyview.csv')
+    'com_pos','make', 'don', 'just', 'point', 'lot', 'does']].to_csv('changemyview.csv')
 
     pass
 
