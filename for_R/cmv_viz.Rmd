@@ -1,0 +1,477 @@
+---
+title: "CMV Visualizations"
+author: "Julian McClellan"
+date: "March 7, 2017"
+output: html_document
+---
+
+```{r setup, include = TRUE, echo = FALSE, warning = FALSE, message = FALSE}
+setwd("~/changemyview/for_R")
+library(tidyverse)
+library(ggplot2)
+library(cowplot)
+library(knitr)
+library(boot)
+library(modelr)
+library(pROC)
+
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+cmv_df <- na.omit(read_csv('changemyview.csv')) %>%
+  select(-X1)
+cmv_cluster_info_df <- read_csv('cmv_cluster_info.csv')
+theme_set(theme_minimal())
+options(digits = 3)
+```
+
+```{r delta_upvotes}
+# delta ndelta counts
+cmv_df %>%
+  group_by(com_delta_received) %>%
+  summarise(count = n()) %>%
+  {.} -> diffs
+
+num_ndeltas <- diffs[1,]$count
+num_deltas <- diffs[2,]$count
+
+delta_df <- filter(cmv_df, com_delta_received == 'True')
+ndelta_df <- filter(cmv_df, com_delta_received == 'False')
+
+calc_sum_stats <- function(dataframe, var){
+  vect_of_int <- dataframe[[var]]
+  rv_list = list(min = min(vect_of_int),
+                 max = max(vect_of_int),
+                 sd = sd(vect_of_int),
+                 mean = mean(vect_of_int))
+  return(rv_list)
+}
+
+d_upvotes <- calc_sum_stats(delta_df, 'com_upvotes')
+
+(delta_df %>%
+  ggplot(aes(com_upvotes)) +
+    geom_histogram(aes(y = ..density..), binwidth = 50) + 
+    # geom_density(color = 'red') +
+    xlim(c(min(delta_df$com_upvotes), 1000)) +
+    # ylim(c(0, .2)) +
+    labs(title = sprintf('Density of Upvotes for %d Comments With a Delta', num_deltas),
+         subtitle = sprintf('min = %d | max = %d | mean = %.2f | sd = %.2f', 
+           d_upvotes$min, d_upvotes$max, d_upvotes$mean, d_upvotes$sd),
+         x = 'Comment Upvotes') %>%
+         {.} -> plt_delta_upvotes)
+```
+
+
+```{r ndelta_upvotes}
+nd_upvotes <- calc_sum_stats(ndelta_df, 'com_upvotes')
+
+(ndelta_df %>%
+  ggplot(aes(com_upvotes)) +
+    geom_histogram(aes(y = ..density..), binwidth = 50) + 
+    xlim(c(min(ndelta_df$com_upvotes), 1000)) +
+    # ylim(c(0, .2)) +
+    # geom_density(color = 'red') +
+    labs(title = sprintf('Density of Upvotes for %d Comments Without a Delta', num_ndeltas),
+         subtitle = sprintf('min = %d | max = %d | mean = %.2f | sd = %.2f', 
+           nd_upvotes$min, nd_upvotes$max, nd_upvotes$mean, nd_upvotes$sd),
+         x = 'Comment Upvotes') %>%
+    {.} -> plt_ndelta_upvotes)
+```
+
+
+```{r delta_com_length}
+d_com_length <- calc_sum_stats(delta_df, 'com_length')
+
+(delta_df %>%
+  ggplot(aes(com_length)) +
+    geom_histogram(aes(y = ..density..), binwidth = 50) + 
+    geom_density(color = 'red') +
+    labs(title = sprintf('Density of Word Count for %d Comments With a Delta', num_deltas),
+         subtitle = sprintf('min = %d | max = %d | mean = %.2f | sd = %.2f', 
+           d_com_length$min, d_com_length$max, d_com_length$mean, d_com_length$sd),
+         x = 'Number of Words In Commment') %>%
+         {.} -> plt_delta_com_length)
+```
+
+
+```{r ndelta_com_length}
+nd_com_length <- calc_sum_stats(ndelta_df, 'com_length')
+
+(ndelta_df %>%
+  ggplot(aes(com_length)) +
+    geom_histogram(aes(y = ..density..), binwidth = 50) + 
+    geom_density(color = 'red') +
+    xlim(c(0, 2000)) +
+    labs(title = sprintf('Density of Word Count for %d Comments Without a Delta', num_ndeltas),
+         subtitle = sprintf('min = %d | max = %d | mean = %.2f | sd = %.2f', 
+           nd_com_length$min, nd_com_length$max, nd_com_length$mean, nd_com_length$sd),
+         x = 'Number of Words In Commment') %>%
+         {.} -> plt_ndelta_com_length)
+```
+
+```{r delta_js}
+d_js <- calc_sum_stats(delta_df, 'JS')
+
+(delta_df %>%
+  ggplot(aes(JS)) +
+    geom_histogram(aes(y = ..density..)) + 
+    geom_density(color = 'red') +
+    labs(title = sprintf('Density of Jensen-Shannon Divergence for %d Comments With a Delta', num_deltas),
+         subtitle = sprintf('min = %.3f | max = %.3f | mean = %.3f | sd = %.3f', 
+           d_js$min, d_js$max, d_js$mean, d_js$sd),
+         x = 'Jensen-Shannon Divergence') %>%
+         {.} -> plt_delta_js)
+```
+
+```{r ndelta_js}
+nd_js <- calc_sum_stats(ndelta_df, 'JS')
+
+(ndelta_df %>%
+  ggplot(aes(JS)) +
+    geom_histogram(aes(y = ..density..)) + 
+    geom_density(color = 'red') +
+    xlim(c(0, .3)) +
+    labs(title = sprintf('Density of Jensen-Shannon Divergence for %d Comments Without a Delta', num_ndeltas),
+         subtitle = sprintf('min = %.3f | max = %.3f | mean = %.3f | sd = %.3f', 
+           nd_js$min, nd_js$max, nd_js$mean, nd_js$sd),
+         x = 'Jensen-Shannon Divergence') %>%
+         {.} -> plt_ndelta_js)
+```
+
+```{r delta_kl}
+d_kl <- calc_sum_stats(delta_df, 'KL')
+
+(delta_df %>%
+  ggplot(aes(KL)) +
+    geom_histogram(aes(y = ..density..)) + 
+    geom_density(color = 'red') +
+    xlim(c(0, 1.5)) + 
+    labs(title = sprintf('Density of Kullback-Leibler Divergence for %d Comments With a Delta', num_deltas),
+         subtitle = sprintf('min = %.3f | max = %.3f | mean = %.3f | sd = %.3f', 
+           d_kl$min, d_kl$max, d_kl$mean, d_kl$sd),
+         x = 'Kullback-Leibler Divergence') %>%
+         {.} -> plt_delta_kl)
+```
+
+```{r ndelta_kl}
+nd_kl <- calc_sum_stats(ndelta_df, 'KL')
+
+(ndelta_df %>%
+  ggplot(aes(KL)) +
+    geom_histogram(aes(y = ..density..)) + 
+    geom_density(color = 'red') +
+    xlim(c(0, 1.5)) +
+    labs(title = sprintf('Density of Kullback-Leibler Divergence for %d Comments Without a Delta', num_ndeltas),
+         subtitle = sprintf('min = %.3f | max = %.3f | mean = %.3f | sd = %.3f', 
+           nd_kl$min, nd_kl$max, nd_kl$mean, nd_kl$sd),
+         x = 'Kullback-Leibler Divergence') %>%
+         {.} -> plt_ndelta_kl)
+```
+
+```{r delta_com_avg_pt_depth}
+d_capt <- calc_sum_stats(delta_df, 'com_avg_pt_depth')
+
+(delta_df %>%
+  ggplot(aes(com_avg_pt_depth)) +
+    geom_histogram(aes(y = ..density..)) + 
+    geom_density(color = 'red') +
+    xlim(c(0, 30)) +
+    labs(title = sprintf('Density of Average Phase Tree Depth for %d Comments With a Delta', num_deltas),
+         subtitle = sprintf('min = %.3f | max = %.3f | mean = %.3f | sd = %.3f', 
+           d_capt$min, d_capt$max, d_capt$mean, d_capt$sd),
+         x = 'Average Phase Tree Depth') %>%
+         {.} -> plt_delta_capt)
+```
+
+```{r ndelta_com_avg_pt_depth}
+nd_capt <- calc_sum_stats(ndelta_df, 'com_avg_pt_depth')
+
+(ndelta_df %>%
+  ggplot(aes(com_avg_pt_depth)) +
+    geom_histogram(aes(y = ..density..)) + 
+    geom_density(color = 'red') +
+    xlim(c(0, 30)) + 
+    labs(title = sprintf('Density of Average Phase Tree Depth for %d Comments Without a Delta', num_ndeltas),
+         subtitle = sprintf('min = %.3f | max = %.3f | mean = %.3f | sd = %.3f', 
+           nd_capt$min, nd_capt$max, nd_capt$mean, nd_capt$sd),
+         x = 'Average Phase Tree Depth') %>%
+         {.} -> plt_ndelta_capt)
+```
+
+```{r delta_pos}
+d_pos <- calc_sum_stats(delta_df, 'com_pos')
+
+(delta_df %>%
+  ggplot(aes(com_pos)) +
+    geom_histogram(aes(y = ..density..)) + 
+    geom_density(color = 'red') +
+    labs(title = sprintf('Density of Average Positive Sentiment for %d Comments With a Delta', num_deltas),
+         subtitle = sprintf('min = %.3f | max = %.3f | mean = %.3f | sd = %.3f', 
+           d_pos$min, d_pos$max, d_pos$mean, d_pos$sd),
+         x = 'Average per sentence Positive Sentiment') %>%
+         {.} -> plt_delta_pos)
+```
+
+```{r ndelta_pos}
+nd_pos <- calc_sum_stats(ndelta_df, 'com_pos')
+
+(ndelta_df %>%
+  ggplot(aes(com_pos)) +
+    geom_histogram(aes(y = ..density..)) + 
+    xlim(c(0, .6)) + 
+    geom_density(color = 'red') +
+    labs(title = sprintf('Density of Average Positive Sentiment %d Comments Without a Delta', num_ndeltas),
+         subtitle = sprintf('min = %.3f | max = %.3f | mean = %.3f | sd = %.3f', 
+           nd_pos$min, nd_pos$max, nd_pos$mean, nd_pos$sd),
+         x = 'Average per sentence Positive Sentiment') %>%
+         {.} -> plt_ndelta_pos)
+```
+
+```{r delta_neg}
+d_neg <- calc_sum_stats(delta_df, 'com_neg')
+
+(delta_df %>%
+  ggplot(aes(com_neg)) +
+    geom_histogram(aes(y = ..density..)) + 
+    geom_density(color = 'red') +
+    xlim(c(0, 1)) + 
+    labs(title = sprintf('Density of Average Negative Sentiment for %d Comments With a Delta', num_deltas),
+         subtitle = sprintf('min = %.3f | max = %.3f | mean = %.3f | sd = %.3f', 
+           d_neg$min, d_neg$max, d_neg$mean, d_neg$sd),
+         x = 'Average per sentence Negative Sentiment') %>%
+         {.} -> plt_delta_neg)
+```
+
+```{r ndelta_neg}
+nd_neg <- calc_sum_stats(ndelta_df, 'com_neg')
+
+(ndelta_df %>%
+  ggplot(aes(com_neg)) +
+    geom_histogram(aes(y = ..density..)) + 
+    geom_density(color = 'red') +
+    labs(title = sprintf('Density of Average Negative Sentiment %d Comments Without a Delta', num_ndeltas),
+         subtitle = sprintf('min = %.3f | max = %.3f | mean = %.3f | sd = %.3f', 
+           nd_neg$min, nd_neg$max, nd_neg$mean, nd_neg$sd),
+         x = 'Average per sentence Negative Sentiment') %>%
+         {.} -> plt_ndelta_neg)
+```
+
+```{r delta_neu}
+d_neu <- calc_sum_stats(delta_df, 'com_neu')
+
+(delta_df %>%
+  ggplot(aes(com_neu)) +
+    geom_histogram(aes(y = ..density..)) + 
+    geom_density(color = 'red') +
+    labs(title = sprintf('Density of Average Neutral Sentiment for %d Comments With a Delta', num_deltas),
+         subtitle = sprintf('min = %.3f | max = %.3f | mean = %.3f | sd = %.3f', 
+           d_neu$min, d_neu$max, d_neu$mean, d_neu$sd),
+         x = 'Average per sentence Neutral Sentiment') %>%
+         {.} -> plt_delta_neu)
+```
+
+```{r ndelta_neu}
+nd_neu <- calc_sum_stats(ndelta_df, 'com_neu')
+
+(ndelta_df %>%
+  ggplot(aes(com_neu)) +
+    geom_histogram(aes(y = ..density..)) + 
+    geom_density(color = 'red') +
+    labs(title = sprintf('Density of Average Neutral Sentiment %d Comments Without a Delta', num_ndeltas),
+         subtitle = sprintf('min = %.3f | max = %.3f | mean = %.3f | sd = %.3f', 
+           nd_neu$min, nd_neu$max, nd_neu$mean, nd_neu$sd),
+         x = 'Average per sentence Neutral Sentiment') %>%
+         {.} -> plt_ndelta_neu)
+```
+
+
+
+```{r compare_plots, echo = TRUE, message = FALSE}
+plot_comp <- function(delta, ndealta){
+  return(plot_grid(delta, ndelta, nrow = 2))
+}
+
+(upvote_com <- plot_grid(plt_delta_upvotes, plt_ndelta_upvotes, nrow = 2))
+(length_com <- plot_grid(plt_delta_com_length, plt_ndelta_com_length, nrow = 2))
+(js_com <- plot_grid(plt_delta_js, plt_ndelta_js, nrow = 2))
+(kl_com <- plot_grid(plt_delta_kl, plt_ndelta_kl, nrow = 2))
+(capt_com <- plot_grid(plt_delta_capt, plt_ndelta_capt, nrow = 2))
+(pos_com <- plot_grid(plt_delta_pos, plt_ndelta_pos, nrow = 2))
+(neg_com <- plot_grid(plt_delta_neg, plt_ndelta_neg, nrow = 2))
+(neu_com <- plot_grid(plt_delta_neu, plt_ndelta_neu, nrow = 2))
+```
+
+```{r cluster_info}
+cmv_cluster_info_df %>%
+  ggplot(aes(kmeans_num, proportion)) +
+  geom_col() + 
+  scale_x_continuous(breaks = seq(0, 14)) + 
+  labs(y = 'Proportion of Submissions', 
+       x = 'Cluster ID', 
+       title = 'Distribution of 15 Clusters within Submissions')
+```
+
+```{r cluster_key}
+cmv_cluster_info_df %>%
+  select(kmeans_num, kmeans_inter) %>%
+  arrange(kmeans_num, kmeans_inter) %>%
+  knitr::kable(col.names = c('Cluster ID', 'Cluster Interpretation'))
+```
+
+```{r bootstrap_tests}
+mean.fun <- function(dat, idx) mean(dat[idx], na.rm = TRUE)
+
+calc_bootstrap_sig <- function(var, cluster = NULL, alpha = .05){
+  if (!is.null(cluster)){
+      delta_df <- delta_df %>% filter(kmeans == cluster)
+      ndelta_df <- ndelta_df %>% filter(kmeans == cluster)
+    if (length(cluster) == 2){
+      calc_cluster_dif_sig(delta_df, ndelta_df, clust1 = cluster[1], clust2 = cluster[2], var = var, alpha = .05)
+    } else {
+      label_add <- sprintf(' | For Cluster %d', cluster) 
+    }
+  } else{
+    label_add <- ''
+  }
+  
+  delta_var_means <- boot(delta_df[[var]], statistic = mean.fun, R = 2000)$t
+  ndelta_var_means <- boot(ndelta_df[[var]], statistic = mean.fun, R = 2000)$t
+  
+  lower_cut <- alpha / 2
+  upper_cut <- 1 - lower_cut
+  
+  delta_quantiles <- quantile(delta_var_means, c(lower_cut, upper_cut))
+  ndelta_quantiles <- quantile(ndelta_var_means, c(lower_cut, upper_cut))
+  
+  if (delta_quantiles[1] > ndelta_quantiles[2]){
+    print(sprintf('For <%s>, comments with deltas have significantly higher values (alpha = %.2f%s)', var, alpha, label_add))
+  } else if (delta_quantiles[2] < ndelta_quantiles[1]){
+    print(sprintf('For <%s>, comments with deltas have significantly lower values (alpha = %.2f%s)', var, alpha, label_add))
+  } else {
+    print(sprintf('For <%s>, comments with deltas do not differ significantly (alpha = %.2f%s)', var, alpha, label_add))
+  }
+  
+  return(as_data_frame(rbind(delta_quantiles, ndelta_quantiles)) %>%
+           mutate(delta_status = c('delta', 'ndelta')))
+}
+
+# calc_cluster_boot_sig <- function(delta, ndelta, ){
+#   
+# }
+```
+
+```{r}
+pr_out <- prcomp(x = select(cmv_df, - c(com_delta_received, kmeans_inter, kmeans, KL)), scale = TRUE)
+biplot(pr_out)
+```
+
+```{r}
+cmv_df %>%
+  ggplot(aes(com_pos, com_neu)) +
+  geom_bin2d()
+```
+
+```{r logit, warning = FALSE}
+calc_test_err <- function(model, data, response = 'vote96'){
+  actual <- data$data[data$idx, ][[response]]
+  
+  if (class(model) == 'factor') { # For output of class::knn
+    test_err <- mean(model != data$data[data$idx, ][[response]], na.rm = TRUE)
+    
+  } else if (class(model) == 'tree') {
+    pred <- predict(model, data, type = 'class')
+    test_err <- mean(pred != actual, na.rm = TRUE)
+    
+  } else if (any(class(model) == 'kknn')) {# Weighted KNN
+    test_err <- 
+      mean((as.numeric(levels(model$fitted.values))[model$fitted.values] - data$data[data$idx, ][[response]]) ^ 2)
+      # mean((model$fitted.values - data$data[data$idx, ][[response]]) ^ 2)
+
+  } else if (any(class(model) == 'gbm')) {
+    # From tree methods notes
+    test_err <- predict(model, newdata = as_tibble(data), type = 'response', n.trees = model$n.trees) %>%
+      (function(x) round(x) != data$data[data$idx, ][[response]]) %>%
+      mean()
+    
+  } else if (any(class(model) == 'randomForest')){
+    pred_factor <- predict(model, data, type = 'class')
+    pred <- as.numeric(levels(pred_factor))[pred_factor]
+
+    test_err <- mean(pred != actual, na.rm = TRUE)
+  } else if (all(class(model) == c('glm', 'lm'))){
+    probs <- predict(model, data, type = 'response')
+    pred <- ifelse(probs > .5, 1, 0)
+    test_err <- mean(pred != actual, na.rm = TRUE)
+  }
+  if (exists('test_err')){
+    return(test_err)
+  } else {
+    print(class(model))
+  }
+}
+
+
+cmv_df %>%
+  mutate(com_delta = factor(ifelse(com_delta_received == 'True', 1, 0))) %>%
+  {.} -> cmv_workable 
+
+set.seed(1234) # Reproducibility
+cmv_workable %>%
+  resample_partition(c(test = .3, train = .7)) %>%
+  {.} -> cmv_split
+
+delta_df %>%
+  mutate(com_delta = ifelse(com_delta_received == 'True', 1, 0)) %>%
+  {.} -> delta_test
+
+ndelta_df %>%
+  mutate(com_delta = ifelse(com_delta_received == 'False', 1, 0)) %>%
+  {.} -> ndelta_test
+
+
+calc_logit_mse <- function(logit_model, data, threshold = .5){
+  actual <- data$com_delta
+  probs <- predict(logit_model, data, type = 'response')
+  
+  pred <- ifelse(probs > threshold, 1, 0)
+  
+  test_err <- mean(pred != actual, na.rm = TRUE)
+  return(test_err)
+}
+
+calc_logit_auc <- function(logit_model, data){
+  actual <- data$data[data$idx, ][['com_delta']]
+  
+  probs <- predict(logit_model, data, type = 'response')
+  auc_score <- auc(actual, probs)
+  return(auc_score)
+}
+
+cmv_split$train %>%
+  glm(factor(com_delta) ~ com_neu + com_pos + com_neg + JS + com_length + com_avg_pt_depth + com_upvotes, data = ., family = binomial) %>%
+  {.} -> cmv_logit
+
+calc_logit_auc(cmv_logit, cmv_split$test)
+
+
+set.seed(1234)
+auc_vals <- data_frame(iterations = seq(1:500),
+                       splits = map(iterations, ~ resample_partition(cmv_workable, c(train = .7, test = .3))),
+                       train = map(splits, ~ .$train),
+                       test = map(splits, ~ .$test),
+                       logit_models = map(train, ~ glm(com_delta ~ com_neu + com_pos + com_neg + JS + com_length + com_avg_pt_depth + com_upvotes,
+                                                        data = .,
+                                                        family = binomial)),
+                       auc_score = map2_dbl(logit_models, test, ~ calc_logit_auc(.x, .y)))
+
+mean_auc = mean(auc_vals$auc_score)
+
+auc_vals %>%
+  ggplot(aes(auc_score)) +
+    geom_density() +
+    geom_vline(aes(xintercept = mean(auc_score), color = 'Mean_AUC'), linetype = 2, show_guide = TRUE) +
+    labs(title = sprintf('Distribution of AUC Score Across %d 70/30 Train Test Splits', length(auc_vals$iterations)),
+         x = 'AUC Score',
+         color = '')
+
+```
